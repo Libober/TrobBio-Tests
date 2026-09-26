@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Интерактивное тестирование</title>
+  <style>
+    /* Базовые стили и переменные */
+    :root {
+      --primary: #1e3a8a;
+      --primary-hover: #1e40af;
+      --bg: #f5f7fa;
+      --card-bg: #ffffff;
+      --text-main: #2c3e50;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #10b981;
+      --success-light: #d1fae5;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --danger: #ef4444;
+      --danger-light: #fee2e2;
+      --shadow: 0 1px 3px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.05);
+      --radius: 8px;
+      --transition: 0.2s ease-in-out;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      font-size: 16px;
+    }
+
+    /* Макет */
+    #app {
+      max-width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+    }
+
+    @media (min-width: 600px) { #app { padding: 24px; } }
+    @media (min-width: 1024px) {
+      #app { max-width: 800px; margin: 0 auto; padding: 40px 20px; font-size: 17px; }
+    }
+
+    /* Экраны */
+    .screen { display: none; animation: fadeIn var(--transition); }
+    .screen.active { display: block; }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Карточки */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    @media (min-width: 600px) { .card { padding: 30px; } }
+
+    h1, h2, h3 { margin-bottom: 16px; color: var(--primary); font-weight: 600; }
+    p { margin-bottom: 16px; }
+
+    /* Кнопки */
+    .btn {
+      display: inline-flex; justify-content: center; align-items: center;
+      min-height: 44px; padding: 10px 20px;
+      border: none; border-radius: 6px;
+      font-size: 16px; font-weight: 500;
+      cursor: pointer; transition: background var(--transition), transform var(--transition);
+      text-align: center; font-family: inherit;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-secondary { background: var(--border); color: var(--text-main); }
+    .btn-secondary:hover:not(:disabled) { background: #cbd5e1; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(50%); }
+
+    .btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+
+    /* Drag & Drop зона */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 40px 20px;
+      text-align: center;
+      background: var(--card-bg);
+      cursor: pointer;
+      transition: all var(--transition);
+      margin-bottom: 20px;
+      min-height: 200px;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+    }
+    .drop-zone.dragover { border-color: var(--primary); background: #e0e7ff; }
+    .drop-zone input[type="file"] { display: none; }
+    .drop-zone-icon { font-size: 48px; color: var(--primary); margin-bottom: 16px; }
+
+    /* Прогресс-бар */
+    .progress-container { margin-bottom: 24px; }
+    .progress-text { font-size: 14px; color: var(--text-muted); margin-bottom: 8px; text-align: right; }
+    .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--primary); transition: width 0.3s ease; width: 0%; }
+
+    /* Вопросы и Картинки */
+    .question-header {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 12px;
+    }
+    .question-image-container {
+      text-align: center;
+      margin: 16px 0;
+    }
+    .question-image-container img {
+      max-width: 100%;
+      max-height: 420px;
+      height: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      object-fit: contain;
+    }
+    .question-text { font-size: 18px; font-weight: 500; margin-bottom: 24px; }
+    .options-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    
+    /* Плитки ответов */
+    .option-tile {
+      display: flex; align-items: center; min-height: 44px; padding: 12px 16px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      cursor: pointer; transition: all var(--transition);
+      background: var(--card-bg);
+    }
+    .option-tile:hover:not(.disabled) { border-color: var(--primary); background: #f8fafc; }
+    .option-tile input { margin-right: 12px; transform: scale(1.2); cursor: pointer; }
+    .option-tile.disabled { cursor: default; opacity: 0.95; }
+
+    /* Подсветка ответов */
+    .option-tile.correct-answer {
+      background-color: var(--success-light) !important;
+      border-color: var(--success) !important;
+      color: #065f46 !important;
+      font-weight: 600;
+    }
+    .option-tile.user-wrong {
+      background-color: var(--danger-light) !important;
+      border-color: var(--danger) !important;
+      color: #991b1b !important;
+    }
+    
+    /* Поля ввода с подсветкой */
+    .text-input {
+      width: 100%; min-height: 44px; padding: 10px 16px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 16px; font-family: inherit; transition: all var(--transition);
+    }
+    .text-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(30,58,138,0.2); }
+    .text-input.input-correct { border-color: var(--success) !important; background-color: var(--success-light) !important; color: #065f46; font-weight: 600; }
+    .text-input.input-wrong { border-color: var(--danger) !important; background-color: var(--danger-light) !important; color: #991b1b; }
+
+    /* Порядок (select) */
+    .order-item {
+      display: flex; align-items: center; gap: 12px; min-height: 44px;
+      padding: 8px 16px; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--card-bg); margin-bottom: 12px; transition: all var(--transition);
+    }
+    .order-select {
+      min-width: 60px; min-height: 36px; padding: 4px 8px;
+      border: 1px solid var(--border); border-radius: 4px;
+      font-size: 16px; cursor: pointer; transition: all var(--transition);
+    }
+    .order-select.input-correct { border-color: var(--success) !important; background-color: var(--success-light) !important; font-weight: bold; }
+    .order-select.input-wrong { border-color: var(--danger) !important; background-color: var(--danger-light) !important; color: #991b1b; }
+    .order-select:disabled { cursor: not-allowed; opacity: 0.9; }
+    .order-text { flex: 1; }
+
+    .order-correct-badge {
+      margin-left: auto; padding: 4px 10px;
+      background: var(--success-light); border: 1px solid var(--success);
+      color: #065f46; border-radius: 4px; font-size: 13px; font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Плашки результатов и решение */
+    .feedback-panel {
+      padding: 18px; border-radius: var(--radius); margin-bottom: 24px; display: none;
+      transition: all var(--transition);
+    }
+    .feedback-panel.correct { background: var(--success-light); border-left: 5px solid var(--success); }
+    .feedback-panel.partial { background: var(--warning-light); border-left: 5px solid var(--warning); }
+    .feedback-panel.wrong { background: var(--danger-light); border-left: 5px solid var(--danger); }
+    .feedback-title { font-weight: 700; font-size: 17px; margin-bottom: 10px; }
+    .feedback-details { font-size: 15px; }
+
+    /* Блок решения */
+    .solution-box {
+      margin-top: 12px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: var(--radius);
+      font-size: 15px;
+      color: var(--text-main);
+      line-height: 1.6;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .solution-title {
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 8px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .solution-line { margin-bottom: 4px; }
+    .solution-line-correct { color: #15803d; font-weight: 600; }
+    .solution-line-wrong { color: #b91c1c; font-weight: 600; }
+    
+    .solution-highlight-yellow {
+      background-color: #fef08a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: #713f12;
+      display: inline-block;
+      margin: 1px 0;
+    }
+
+    /* Экран результатов */
+    .result-stat { font-size: 24px; font-weight: bold; color: var(--primary); margin-bottom: 8px; }
+    .result-percent { font-size: 18px; color: var(--text-muted); margin-bottom: 24px; }
+    .breakdown-hint { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
+    .breakdown-list { list-style: none; margin-bottom: 24px; }
+    
+    .breakdown-item {
+      padding: 14px; border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 10px; display: flex; justify-content: space-between; gap: 16px; align-items: center;
+      cursor: pointer; background: var(--card-bg); transition: all var(--transition);
+    }
+    .breakdown-item:hover {
+      border-color: var(--primary); background: #f8fafc; transform: translateX(3px);
+    }
+    .breakdown-q { flex: 1; font-size: 15px; }
+    .breakdown-status { font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
+    .breakdown-status.status-correct { background: var(--success-light); color: #065f46; }
+    .breakdown-status.status-partial { background: var(--warning-light); color: #92400e; }
+    .breakdown-status.status-wrong { background: var(--danger-light); color: #991b1b; }
+
+    /* Сообщения */
+    #ui-message {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #334155; color: #fff; padding: 12px 24px; border-radius: 30px;
+      box-shadow: var(--shadow-md); z-index: 1000; display: none; text-align: center; width: 90%; max-width: 400px;
+    }
+    
+    /* Модальные окна */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center;
+      z-index: 2000; opacity: 0; pointer-events: none; transition: opacity var(--transition);
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal-card {
+      background: #fff; padding: 24px; border-radius: var(--radius);
+      width: 90%; max-width: 600px; box-shadow: var(--shadow-md);
+      max-height: 85vh; overflow-y: auto;
+    }
+    .modal-card h3 { margin-top: 0; }
+
+    .hidden { display: none !important; }
+    :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+
+  <div id="app">
+    <!-- Экран 1: Загрузка -->
+    <section id="screen-upload" class="screen active">
+      <div class="card">
+        <h1>Загрузка теста</h1>
+        <p>Выберите документ Word (.docx), содержащий тестовые задания с блоками решений и изображениями.</p>
+        
+        <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Зона загрузки файла">
+          <div class="drop-zone-icon">📄</div>
+          <p><strong>Нажмите, чтобы выбрать файл</strong><br>или перетащите .docx сюда</p>
+          <input type="file" id="file-input" accept=".docx">
+        </div>
+
+             </div>
+    </section>
+
+    <!-- Экран 2: Приветствие -->
+    <section id="screen-welcome" class="screen">
+      <div class="card">
+        <h1 id="welcome-title">Название теста</h1>
+        <p id="welcome-info">Количество вопросов: 0</p>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-start">Начать тест</button>
+          <button class="btn btn-secondary" id="btn-change-file">Загрузить другой файл</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Экран 3: Вопрос -->
+    <section id="screen-question" class="screen">
+      <div class="card">
+        <div class="progress-container">
+          <div class="progress-text" id="progress-text">Вопрос 1 из 10</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- Порядок: Номер -> Картинка -> Текст вопроса -->
+        <div id="question-num" class="question-header">Задание 1</div>
+        <div id="question-images" class="question-image-container"></div>
+        <div id="question-text" class="question-text">Текст вопроса...</div>
+        
+        <!-- Контейнер для вариантов ответа -->
+        <div id="options-container" class="options-list"></div>
+
+        <!-- Плашка результата с табличкой решения -->
+        <div id="feedback-panel" class="feedback-panel">
+          <div id="feedback-title" class="feedback-title">Результат</div>
+          <div id="feedback-details" class="feedback-details"></div>
+        </div>
+
+        <div class="btn-group" style="justify-content: space-between;">
+          <button class="btn btn-secondary" id="btn-prev" disabled>Назад</button>
+          <button class="btn btn-primary" id="btn-check-next" disabled>Проверить</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Экран 4: Результаты -->
+    <section id="screen-results" class="screen">
+      <div class="card">
+        <h1 id="results-title">Результаты теста</h1>
+        <div class="result-stat" id="result-stat">Правильных ответов: 0 из 0</div>
+        <div class="result-percent" id="result-percent">0% выполнения</div>
+        
+        <h3>Детализация по вопросам</h3>
+        <p class="breakdown-hint">💡 Нажмите на любой вопрос, чтобы подробно разобрать ответы и решения.</p>
+        <ul class="breakdown-list" id="breakdown-list"></ul>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-restart">Пройти заново</button>
+          <button class="btn btn-secondary" id="btn-finish-change">Загрузить другой файл</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- UI Уведомления -->
+  <div id="ui-message">Сообщение</div>
+
+  <!-- Модальное окно: Продолжить незавершённый тест -->
+  <div class="modal-overlay" id="resume-modal">
+    <div class="modal-card">
+      <h3>Найден незавершённый тест</h3>
+      <p>Вы уже начинали проходить этот тест. Желаете продолжить с места остановки или начать заново?</p>
+      <div class="btn-group" style="justify-content: flex-end;">
+        <button class="btn btn-secondary" id="btn-modal-restart">Начать заново</button>
+        <button class="btn btn-primary" id="btn-modal-resume">Продолжить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно: Просмотр разбора вопроса из результатов -->
+  <div class="modal-overlay" id="review-modal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 id="review-modal-title" style="margin:0;">Разбор вопроса</h3>
+        <button class="btn btn-secondary" id="btn-close-review" style="min-height:36px; padding:4px 12px; margin-left:auto;">✕</button>
+      </div>
+      <div id="review-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Mammoth.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js"></script>
+
+  <script>
+    let state = {
+      version: 1,
+      title: '',
+      hash: '',
+      questions: [],
+      shuffledQuestionIds: [],
+      shuffledOptions: {},
+      currentIndex: 0,
+      answers: {},
+      results: {},
+      completed: false,
+      savedAt: 0
+    };
+
+    const $ = id => document.getElementById(id);
+    
+    function showMessage(msg, duration = 4000) {
+      const el = $('ui-message');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', duration);
+    }
+
+    function switchScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      $(screenId).classList.add('active');
+    }
+
+    function simpleHash(str) {
+      let h = 0;
+      for (let i = 0; i < str.length; i++) {
+        h = ((h << 5) - h) + str.charCodeAt(i);
+        h |= 0;
+      }
+      return String(h >>> 0);
+    }
+
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function roundScore(val) {
+      return Math.round(val * 100) / 100;
+    }
+
+    function decodeHtmlEntities(html) {
+      const txt = document.createElement("textarea");
+      txt.innerHTML = html;
+      return txt.value;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    const STORAGE_KEY = 'test_progress_v2';
+
+    function saveProgress() {
+      state.savedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function loadProgress() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (data) return JSON.parse(data);
+      } catch (e) {
+        console.error('Ошибка чтения из localStorage', e);
+      }
+      return null;
+    }
+
+    function clearProgress() {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    /* Обработка HTML после считывания Mammoth.js */
+    function processParsedHtml(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Заменяем теги <img> на специальные маркеры переноса изображений
+      const imgs = doc.querySelectorAll('img');
+      imgs.forEach(img => {
+        const src = img.getAttribute('src');
+        if (src) {
+          const token = doc.createTextNode(`\n[IMG_TOKEN:${src}]\n`);
+          img.parentNode.replaceChild(token, img);
+        }
+      });
+
+      let text = doc.body.innerHTML;
+      text = text.replace(/<\/p>/gi, '\n');
+      text = text.replace(/<p[^>]*>/gi, '');
+      text = text.replace(/<br\s*\/?>/gi, '\n');
+      text = text.replace(/<[^>]+>/g, '');
+      text = decodeHtmlEntities(text);
+      text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+      text = text.replace(/-{2,}/g, '—');
+
+      return parseTest(text);
+    }
+
+    function isIgnoredLine(line) {
+      const lower = line.toLowerCase();
+      if (lower.startsWith('формат оформления')) return true;
+      if (lower.startsWith('формат для импорта')) return true;
+      if (lower.startsWith('onlinetestpad')) return true;
+      if (lower.startsWith('===== page')) return true;
+      if (lower.startsWith('количество вопросов')) return true;
+      if (/^[-=*]+$/.test(line)) return true;
+      return false;
+    }
+
+    function parseTest(rawText) {
+      const lines = rawText.split('\n').map(l => l.trim());
+      let title = '';
+      const rawQuestions = [];
+      let currentQ = null;
+      let qIdCount = 1;
+      let parseMode = 'START';
+
+      for (let line of lines) {
+        if (!line) continue;
+        if (isIgnoredLine(line)) continue;
+
+        // Перехват картинок
+        const imgMatch = line.match(/^\[IMG_TOKEN:(.+)\]$/);
+        if (imgMatch) {
+          if (currentQ) {
+            currentQ.images.push(imgMatch[1]);
+          }
+          continue;
+        }
+
+        const isTaskHeader = /^Задание\s+\d+/i.test(line);
+
+        if (isTaskHeader) {
+          if (currentQ) {
+            rawQuestions.push(currentQ);
+          }
+
+          const matchHeader = line.match(/^(Задание\s+\d+[\.\:]?)(.*)/i);
+          let taskNum = '';
+          let qText = '';
+          if (matchHeader) {
+            taskNum = matchHeader[1].trim();
+            qText = matchHeader[2].trim();
+          } else {
+            taskNum = line;
+            qText = '';
+          }
+
+          currentQ = {
+            id: qIdCount++,
+            taskNum: taskNum,
+            question: qText,
+            images: [],
+            options: [],
+            solution: [],
+            orderItems: []
+          };
+          parseMode = 'QUESTION';
+          if (!title) title = 'Тестовые задания';
+          continue;
+        }
+
+        // Блок "Решение:"
+        if (/^Решение:?/i.test(line)) {
+          if (currentQ) {
+            parseMode = 'SOLUTION';
+            const solutionHeading = line.replace(/^Решение:?/i, '').trim();
+            if (solutionHeading) {
+              currentQ.solution.push(solutionHeading);
+            }
+          }
+          continue;
+        }
+
+        // Варианты ответов (+ или -)
+        if ((line.startsWith('+') || line.startsWith('-')) && parseMode !== 'SOLUTION') {
+          if (currentQ) {
+            parseMode = 'OPTIONS';
+            currentQ.options.push({
+              correct: line.startsWith('+'),
+              text: line.substring(1).trim()
+            });
+          }
+          continue;
+        }
+
+        // Сбор строк решения
+        if (parseMode === 'SOLUTION' && currentQ) {
+          currentQ.solution.push(line);
+          continue;
+        }
+
+        // Сбор текста вопроса
+        if (parseMode === 'QUESTION' && currentQ) {
+          currentQ.question += (currentQ.question ? ' ' : '') + line;
+          continue;
+        }
+
+        // Очистка от старых подписей картинок в тексте
+        line = line.replace(/\[(?:Вставить картинку|Рис\.|Иллюстрация)[^\]]*\]/gi, '').trim();
+        if (!line) continue;
+
+        if (!title) {
+          title = line;
+        } else {
+          if (parseMode === 'OPTIONS' || parseMode === 'SOLUTION') {
+            if (currentQ && currentQ.options.length > 0) {
+              rawQuestions.push(currentQ);
+            }
+            const matchHeader = line.match(/^(Задание\s+\d+[\.\:]?)(.*)/i);
+            currentQ = {
+              id: qIdCount++,
+              taskNum: matchHeader ? matchHeader[1].trim() : `Задание ${qIdCount}.`,
+              question: matchHeader ? matchHeader[2].trim() : line,
+              images: [],
+              options: [],
+              solution: [],
+              orderItems: []
+            };
+            parseMode = 'QUESTION';
+          }
+        }
+      }
+
+      if (currentQ && currentQ.options.length > 0) {
+        rawQuestions.push(currentQ);
+      }
+
+      const validQuestions = [];
+      for (const q of rawQuestions) {
+        if (q.options.length < 2) continue;
+        if (q.options.every(o => !o.correct)) continue;
+
+        let type = 'single';
+        const hasOrderKeywords = /(последовательность|порядок|расположите)/i.test(q.question);
+        const allCorrect = q.options.every(o => o.correct);
+        const correctCount = q.options.filter(o => o.correct).length;
+        const hasWrong = q.options.some(o => !o.correct);
+
+        if (hasOrderKeywords && allCorrect) {
+          type = 'order';
+        } else if (correctCount >= 2 && hasWrong) {
+          type = 'multiple';
+        } else if (allCorrect && !hasOrderKeywords) {
+          type = 'text';
+        } else if (correctCount === 1) {
+          type = 'single';
+        } else {
+          continue;
+        }
+
+        let finalOptions = q.options;
+        if (type === 'text' || type === 'order') {
+          const unique = [];
+          const seen = new Set();
+          for (const o of q.options) {
+            const norm = o.text.trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!seen.has(norm)) {
+              seen.add(norm);
+              unique.push(o);
+            }
+          }
+          finalOptions = unique;
+        }
+
+        if (type === 'order' && finalOptions.length < 2) continue;
+
+        validQuestions.push({
+          id: q.id,
+          taskNum: q.taskNum || `Задание ${q.id}.`,
+          question: q.question,
+          images: q.images || [],
+          type: type,
+          options: type !== 'order' ? finalOptions : [],
+          orderItems: type === 'order' ? finalOptions.map(o => o.text) : [],
+          solution: q.solution || []
+        });
+      }
+
+      if (validQuestions.length === 0) {
+        throw new Error('В документе не найдено ни одного правильного вопроса.');
+      }
+
+      return {
+        title: title || 'Тест без названия',
+        questions: validQuestions,
+        hash: simpleHash(rawText)
+      };
+    }
+
+    function handleFile(file) {
+      if (!file.name.toLowerCase().endsWith('.docx')) {
+        showMessage('Пожалуйста, выберите файл в формате .docx');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const arrayBuffer = e.target.result;
+        try {
+          if (typeof mammoth === 'undefined') throw new Error('Библиотека mammoth не загружена.');
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          if (!result.value) throw new Error('Файл пуст или повреждён.');
+          
+          const parsedData = processParsedHtml(result.value);
+          onTestLoaded(parsedData);
+        } catch (error) {
+          showMessage(error.message || 'Не удалось прочитать файл.');
+          console.error(error);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function onTestLoaded(parsedData) {
+      const saved = loadProgress();
+      if (saved && saved.hash === parsedData.hash && !saved.completed) {
+        $('resume-modal').classList.add('active');
+        
+        $('btn-modal-resume').onclick = () => {$('resume-modal').classList.remove('active');
+          state = saved;
+          showWelcomeScreen();
+        };
+        $('btn-modal-restart').onclick = () => {$('resume-modal').classList.remove('active');
+          initNewState(parsedData);
+          showWelcomeScreen();
+        };
+      } else {
+        initNewState(parsedData);
+        showWelcomeScreen();
+      }
+    }
+
+    function initNewState(parsedData) {
+      state = {
+        version: 1,
+        title: parsedData.title,
+        hash: parsedData.hash,
+        questions: parsedData.questions,
+        shuffledQuestionIds: [],
+        shuffledOptions: {},
+        currentIndex: 0,
+        answers: {},
+        results: {},
+        completed: false,
+        savedAt: Date.now()
+      };
+      saveProgress();
+    }
+
+    function generateShuffles() {
+      const qIds = state.questions.map(q => q.id);
+      state.shuffledQuestionIds = shuffleArray(qIds);
+      
+      state.shuffledOptions = {};
+      state.questions.forEach(q => {
+        let indices = [];
+        if (q.type === 'order') {
+          indices = q.orderItems.map((_, i) => i);
+        } else {
+          indices = q.options.map((_, i) => i);
+        }
+        state.shuffledOptions[q.id] = shuffleArray(indices);
+      });
+    }
+
+    function startTest() {
+      if (!state.shuffledQuestionIds.length || state.completed) {
+        state.answers = {};
+        state.results = {};
+        state.currentIndex = 0;
+        state.completed = false;
+        generateShuffles();
+      }
+      saveProgress();
+      showQuestionScreen();
+    }
+
+    function showWelcomeScreen() {
+      $('welcome-title').textContent = state.title;
+      $('welcome-info').textContent = `Количество вопросов: ${state.questions.length}`;
+      $('btn-start').textContent = (state.answers && Object.keys(state.answers).length > 0 && !state.completed) ? 'Продолжить тест' : 'Начать тест';
+      switchScreen('screen-welcome');
+    }
+
+    function getCurrentQuestion() {
+      const id = state.shuffledQuestionIds[state.currentIndex];
+      return state.questions.find(q => q.id === id);
+    }
+
+    function showQuestionScreen() {
+      const q = getCurrentQuestion();
+      if (!q) return;
+
+      switchScreen('screen-question');
+      
+      const total = state.shuffledQuestionIds.length;
+      $('progress-text').textContent = `Вопрос ${state.currentIndex + 1} из ${total}`;
+      $('progress-fill').style.width = `${((state.currentIndex + 1) / total) * 100}%`;
+      
+      // 1. Заголовок задания
+      $('question-num').textContent = q.taskNum || `Задание ${q.id}.`;
+
+      // 2. Изображение (расположено между заголовком и текстом)
+      const imgContainer = $('question-images');
+      imgContainer.innerHTML = '';
+      if (q.images && q.images.length > 0) {
+        q.images.forEach(src => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = 'Иллюстрация к заданию';
+          imgContainer.appendChild(img);
+        });
+        imgContainer.style.display = 'block';
+      } else {
+        imgContainer.style.display = 'none';
+      }
+
+      // 3. Текст вопроса
+      $('question-text').textContent = q.question;
+      
+      const cont = $('options-container');
+      cont.innerHTML = '';
+      
+      const isChecked = !!state.results[q.id];
+      const answer = state.answers[q.id] || {};
+      const indices = state.shuffledOptions[q.id];
+      
+      if (q.type === 'single') {
+        indices.forEach(origIdx => {
+          const opt = q.options[origIdx];
+          const label = document.createElement('label');
+          label.className = `option-tile ${isChecked ? 'disabled' : ''}`;
+          
+          if (isChecked) {
+            if (opt.correct) label.classList.add('correct-answer');
+            if (answer.selectedIndex === origIdx && !opt.correct) label.classList.add('user-wrong');
+          }
+
+          const inp = document.createElement('input');
+          inp.type = 'radio';
+          inp.name = `q_${q.id}`;
+          inp.value = origIdx;
+          if (answer.selectedIndex === origIdx) inp.checked = true;
+          if (isChecked) inp.disabled = true;
+          
+          inp.addEventListener('change', () => validateInputs(q.type));
+          
+          label.appendChild(inp);
+          label.appendChild(document.createTextNode(opt.text));
+          cont.appendChild(label);
+        });
+      } 
+      else if (q.type === 'multiple') {
+        indices.forEach(origIdx => {
+          const opt = q.options[origIdx];
+          const label = document.createElement('label');
+          label.className = `option-tile ${isChecked ? 'disabled' : ''}`;
+          
+          const isSelected = answer.selectedIndexes && answer.selectedIndexes.includes(origIdx);
+
+          if (isChecked) {
+            if (opt.correct) label.classList.add('correct-answer');
+            if (isSelected && !opt.correct) label.classList.add('user-wrong');
+          }
+
+          const inp = document.createElement('input');
+          inp.type = 'checkbox';
+          inp.value = origIdx;
+          if (isSelected) inp.checked = true;
+          if (isChecked) inp.disabled = true;
+          
+          inp.addEventListener('change', () => validateInputs(q.type));
+          
+          label.appendChild(inp);
+          label.appendChild(document.createTextNode(opt.text));
+          cont.appendChild(label);
+        });
+      }
+      else if (q.type === 'text') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'text-input';
+        inp.placeholder = 'Введите ваш ответ...';
+        if (answer.value) inp.value = answer.value;
+        
+        if (isChecked) {
+          inp.disabled = true;
+          if (state.results[q.id].status === 'correct') {
+            inp.classList.add('input-correct');
+          } else {
+            inp.classList.add('input-wrong');
+          }
+        }
+        
+        inp.addEventListener('input', () => validateInputs(q.type));
+        cont.appendChild(inp);
+      }
+      else if (q.type === 'order') {
+        indices.forEach((origIdx, renderIdx) => {
+          const itemText = q.orderItems[origIdx];
+          const div = document.createElement('div');
+          div.className = 'order-item';
+          
+          const sel = document.createElement('select');
+          sel.className = 'order-select';
+          sel.dataset.renderIdx = renderIdx;
+          
+          const defaultOpt = document.createElement('option');
+          defaultOpt.value = '';
+          defaultOpt.textContent = '—';
+          sel.appendChild(defaultOpt);
+          
+          for (let i = 1; i <= indices.length; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = i;
+            sel.appendChild(opt);
+          }
+          
+          const userPos = answer.positions ? answer.positions[renderIdx] : '';
+          if (userPos) sel.value = userPos;
+
+          const correctPos = origIdx + 1;
+
+          if (isChecked) {
+            sel.disabled = true;
+            if (parseInt(userPos) === correctPos) {
+              sel.classList.add('input-correct');
+            } else {
+              sel.classList.add('input-wrong');
+            }
+          }
+          
+          sel.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val) {
+              document.querySelectorAll('.order-select').forEach(other => {
+                if (other !== e.target && other.value === val) {
+                  other.value = '';
+                }
+              });
+            }
+            validateInputs(q.type);
+          });
+          
+          const span = document.createElement('span');
+          span.className = 'order-text';
+          span.textContent = itemText;
+          
+          div.appendChild(sel);
+          div.appendChild(span);
+
+          if (isChecked && parseInt(userPos) !== correctPos) {
+            const correctBadge = document.createElement('span');
+            correctBadge.className = 'order-correct-badge';
+            correctBadge.textContent = `Должно быть: ${correctPos}`;
+            div.appendChild(correctBadge);
+          }
+
+          cont.appendChild(div);
+        });
+      }
+
+      // Управление кнопками
+      $('btn-prev').disabled = (state.currentIndex === 0);
+      const btnCheckNext = $('btn-check-next');
+      
+      if (isChecked) {
+        showFeedback(q.id);
+        const isLast = state.currentIndex === total - 1;
+        btnCheckNext.textContent = isLast ? 'Показать результат' : 'Следующий вопрос';
+        btnCheckNext.disabled = false;
+        btnCheckNext.onclick = nextQuestion;
+      } else {
+        $('feedback-panel').style.display = 'none';
+        btnCheckNext.textContent = 'Проверить';
+        btnCheckNext.onclick = checkAnswer;
+        validateInputs(q.type);
+      }
+    }
+
+    function validateInputs(type) {
+      const btn = $('btn-check-next');
+      const cont = $('options-container');
+      let isValid = false;
+      
+      if (type === 'single') {
+        isValid = !!cont.querySelector('input:checked');
+      } else if (type === 'multiple') {
+        isValid = cont.querySelectorAll('input:checked').length > 0;
+      } else if (type === 'text') {
+        isValid = cont.querySelector('input').value.trim().length > 0;
+      } else if (type === 'order') {
+        const selects = Array.from(cont.querySelectorAll('select'));
+        isValid = selects.length > 0 && selects.every(s => s.value !== '');
+      }
+      
+      btn.disabled = !isValid;
+    }
+
+    function checkAnswer() {
+      const q = getCurrentQuestion();
+      const cont = $('options-container');
+      let score = 0;
+      let status = 'wrong';
+      let ansData = {};
+      
+      if (q.type === 'single') {
+        const selected = cont.querySelector('input:checked');
+        const val = parseInt(selected.value);
+        ansData = { selectedIndex: val };
+        
+        if (q.options[val].correct) {
+          score = 1; status = 'correct';
+        }
+      } 
+      else if (q.type === 'multiple') {
+        const selectedNodes = cont.querySelectorAll('input:checked');
+        const vals = Array.from(selectedNodes).map(n => parseInt(n.value));
+        ansData = { selectedIndexes: vals };
+        
+        const totalCorrect = q.options.filter(o => o.correct).length;
+        let correctSelected = 0;
+        let wrongSelected = 0;
+        
+        vals.forEach(v => {
+          if (q.options[v].correct) correctSelected++;
+          else wrongSelected++;
+        });
+        
+        if (wrongSelected > 0) {
+          score = 0;
+        } else {
+          score = correctSelected / totalCorrect;
+          if (score === 1) status = 'correct';
+          else if (score > 0) status = 'partial';
+        }
+      }
+      else if (q.type === 'text') {
+        const val = cont.querySelector('input').value;
+        ansData = { value: val };
+        
+        const normVal = val.trim().toLowerCase().replace(/\s+/g, ' ');
+        const isMatch = q.options.some(o => {
+          const normOpt = o.text.trim().toLowerCase().replace(/\s+/g, ' ');
+          return normOpt === normVal;
+        });
+        
+        if (isMatch) {
+          score = 1; status = 'correct';
+        }
+      }
+      else if (q.type === 'order') {
+        const selects = cont.querySelectorAll('select');
+        ansData = { positions: {} };
+        let correctCount = 0;
+        const totalItems = q.orderItems.length;
+        
+        selects.forEach(s => {
+          const renderIdx = parseInt(s.dataset.renderIdx);
+          const userPos = parseInt(s.value);
+          ansData.positions[renderIdx] = userPos;
+          
+          const origIdx = state.shuffledOptions[q.id][renderIdx];
+          const correctPos = origIdx + 1;
+          if (userPos === correctPos) correctCount++;
+        });
+        
+        score = correctCount / totalItems;
+        if (score === 1) status = 'correct';
+        else if (score > 0) status = 'partial';
+      }
+
+      state.answers[q.id] = ansData;
+      state.results[q.id] = { checked: true, score: score, status: status };
+      saveProgress();
+      
+      showQuestionScreen();
+    }
+
+    function renderSolutionBox(q, status) {
+      let solutionHtml = '';
+
+      if (q.solution && q.solution.length > 0) {
+        solutionHtml += '<div class="solution-box">';
+        solutionHtml += '<div class="solution-title">📋 Таблица решения:</div>';
+
+        q.solution.forEach(line => {
+          const lineClean = escapeHtml(line);
+          if (!lineClean.trim()) return;
+
+          if (/^(Правильный ответ|Верные ответы|Правильная последовательность)/i.test(line)) {
+            solutionHtml += `<div class="solution-line solution-line-correct">${lineClean}</div>`;
+          } else if (/^(Не подходят|Пояснение)/i.test(line)) {
+            solutionHtml += `<div class="solution-line solution-line-wrong" style="margin-top:10px;">${lineClean}</div>`;
+          } else {
+            solutionHtml += `<div class="solution-line">${lineClean}</div>`;
+          }
+        });
+        
+        solutionHtml += '</div>';
+      } else {
+        if (status !== 'correct') {
+          solutionHtml += '<div class="solution-box"><strong>Правильный ответ:</strong><br>';
+          if (q.type === 'single' || q.type === 'multiple') {
+            const correctTexts = q.options.filter(o => o.correct).map(o => o.text);
+            solutionHtml += `<ul style="margin-left:20px; margin-top:6px;">${correctTexts.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+          } else if (q.type === 'text') {
+            const correctTexts = q.options.map(o => o.text);
+            solutionHtml += `<ul style="margin-left:20px; margin-top:6px;">${correctTexts.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+          } else if (q.type === 'order') {
+            solutionHtml += `<ol style="margin-left:20px; margin-top:6px;">${q.orderItems.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ol>`;
+          }
+          solutionHtml += '</div>';
+        }
+      }
+
+      return solutionHtml;
+    }
+
+    function showFeedback(qId) {
+      const res = state.results[qId];
+      const q = state.questions.find(q => q.id === qId);
+      const panel = $('feedback-panel');
+      const title = $('feedback-title');
+      const details = $('feedback-details');
+      
+      panel.style.display = 'block';
+      panel.className = `feedback-panel ${res.status}`;
+      
+      if (res.status === 'correct') {
+        title.textContent = `Верно! (+${roundScore(res.score)} балла)`;
+      } else if (res.status === 'partial') {
+        title.textContent = `Частично верно (+${roundScore(res.score)} балла)`;
+      } else {
+        title.textContent = `Неверно (0 баллов)`;
+      }
+
+      details.innerHTML = renderSolutionBox(q, res.status);
+    }
+
+    function nextQuestion() {
+      if (state.currentIndex < state.shuffledQuestionIds.length - 1) {
+        state.currentIndex++;
+        saveProgress();
+        showQuestionScreen();
+      } else {
+        finishTest();
+      }
+    }
+
+    $('btn-prev').onclick = () => {
+      if (state.currentIndex > 0) {
+        state.currentIndex--;
+        saveProgress();
+        showQuestionScreen();
+      }
+    };
+
+    function finishTest() {
+      state.completed = true;
+      saveProgress();
+      showResultsScreen();
+    }
+
+    function showResultsScreen() {
+      $('results-title').textContent = state.title;
+      
+      let totalScore = 0;
+      const totalQuestions = state.questions.length;
+      
+      const list = $('breakdown-list');
+      list.innerHTML = '';
+      
+      state.questions.forEach(q => {
+        const res = state.results[q.id] || { score: 0, status: 'wrong' };
+        totalScore += res.score;
+        
+        const li = document.createElement('li');
+        li.className = 'breakdown-item';
+        li.tabIndex = 0;
+        
+        let qTextShort = q.question.length > 100 ? q.question.substring(0, 100) + '...' : q.question;
+        
+        let statusBadge = '';
+        if (res.status === 'correct') statusBadge = `<span class="breakdown-status status-correct">1 / 1 (Верно)</span>`;
+        else if (res.status === 'partial') statusBadge = `<span class="breakdown-status status-partial">${roundScore(res.score)} / 1 (Частично)</span>`;
+        else statusBadge = `<span class="breakdown-status status-wrong">0 / 1 (Неверно)</span>`;
+
+        const headerStr = q.taskNum || `Задание №${q.id}`;
+        li.innerHTML = `
+          <div class="breakdown-q"><strong>${escapeHtml(headerStr)}:</strong> ${escapeHtml(qTextShort)}</div>
+          ${statusBadge}
+        `;
+
+        li.onclick = () => openReviewModal(q.id);
+        li.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') openReviewModal(q.id); };
+
+        list.appendChild(li);
+      });
+      
+      totalScore = roundScore(totalScore);
+      const percent = roundScore((totalScore / totalQuestions) * 100);
+      
+      $('result-stat').textContent = `Правильных ответов: ${totalScore} из ${totalQuestions}`;
+      $('result-percent').textContent = `${percent}% выполнения`;
+      
+      switchScreen('screen-results');
+    }
+
+    function openReviewModal(qId) {
+      const q = state.questions.find(item => item.id === qId);
+      const ans = state.answers[qId] || {};
+      const res = state.results[qId] || { score: 0, status: 'wrong' };
+
+      $('review-modal-title').textContent = q.taskNum || `Задание №${q.id}`;
+      const body = $('review-modal-body');
+      body.innerHTML = '';
+
+      // 1. Изображение в разборе модального окна (если есть)
+      if (q.images && q.images.length > 0) {
+        const imgDiv = document.createElement('div');
+        imgDiv.className = 'question-image-container';
+        q.images.forEach(src => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = 'Иллюстрация к заданию';
+          imgDiv.appendChild(img);
+        });
+        body.appendChild(imgDiv);
+      }
+
+      // 2. Текст вопроса
+      const qText = document.createElement('div');
+      qText.className = 'question-text';
+      qText.style.fontSize = '16px';
+      qText.textContent = q.question;
+      body.appendChild(qText);
+
+      const statusDiv = document.createElement('div');
+      statusDiv.style.marginBottom = '16px';
+      statusDiv.style.fontSize = '15px';
+      
+      if (res.status === 'correct') {
+        statusDiv.innerHTML = `<span style="color:var(--success); font-weight:bold;">Результат: Верно (+${roundScore(res.score)} балла)</span>`;
+      } else if (res.status === 'partial') {
+        statusDiv.innerHTML = `<span style="color:var(--warning); font-weight:bold;">Результат: Частично верно (+${roundScore(res.score)} балла)</span>`;
+      } else {
+        statusDiv.innerHTML = `<span style="color:var(--danger); font-weight:bold;">Результат: Неверно (0 баллов)</span>`;
+      }
+      body.appendChild(statusDiv);
+
+      if (q.type === 'single' || q.type === 'multiple') {
+        const list = document.createElement('div');
+        list.className = 'options-list';
+        
+        q.options.forEach((opt, idx) => {
+          const isUserPick = q.type === 'single' ? (ans.selectedIndex === idx) : ((ans.selectedIndexes || []).includes(idx));
+          const isCorrect = opt.correct;
+
+          const tile = document.createElement('div');
+          tile.className = 'option-tile disabled';
+          
+          if (isCorrect) tile.classList.add('correct-answer');
+          if (isUserPick && !isCorrect) tile.classList.add('user-wrong');
+
+          let badge = '';
+          if (isUserPick && isCorrect) badge = ' <strong style="color:var(--success); margin-left:8px;">✓ Ваш выбор (Верно)</strong>';
+          else if (isUserPick && !isCorrect) badge = ' <strong style="color:var(--danger); margin-left:8px;">✗ Ваш выбор (Ошибка)</strong>';
+          else if (isCorrect) badge = ' <strong style="color:var(--success); margin-left:8px;">✓ Правильный ответ</strong>';
+
+          tile.innerHTML = `<span>${escapeHtml(opt.text)} ${badge}</span>`;
+          list.appendChild(tile);
+        });
+        body.appendChild(list);
+      } 
+      else if (q.type === 'text') {
+        const div = document.createElement('div');
+        const userVal = ans.value ? escapeHtml(ans.value) : '<em>Ответ не введён</em>';
+        const correctVals = q.options.map(o => escapeHtml(o.text)).join(', ');
+        
+        div.innerHTML = `
+          <div style="margin-bottom:12px; padding:10px; border-radius:6px; background:${res.status==='correct'?'var(--success-light)':'var(--danger-light)'}">
+            <strong>Ваш ответ:</strong> ${userVal}
+          </div>
+          <div style="padding:10px; border-radius:6px; background:var(--success-light)">
+            <strong>Допустимые правильные варианты:</strong> ${correctVals}
+          </div>
+        `;
+        body.appendChild(div);
+      } 
+      else if (q.type === 'order') {
+        const div = document.createElement('div');
+        let html = '<p><strong>Ваш порядок:</strong></p><ol style="margin-left:20px; margin-bottom:16px;">';
+        
+        const indices = state.shuffledOptions[q.id] || q.orderItems.map((_, i) => i);
+        indices.forEach((origIdx, renderIdx) => {
+          const userPos = ans.positions ? ans.positions[renderIdx] : '—';
+          const itemText = q.orderItems[origIdx];
+          const correctPos = origIdx + 1;
+          const isRight = parseInt(userPos) === correctPos;
+          
+          const color = isRight ? 'var(--success)' : 'var(--danger)';
+          const label = isRight ? '✓ на своём месте' : `✗ должно быть на позиции ${correctPos}`;
+          
+          html += `<li style="margin-bottom:6px;">
+            Позиция ${userPos}: ${escapeHtml(itemText)} 
+            <span style="color:${color}; font-weight:bold; font-size:13px;">(${label})</span>
+          </li>`;
+        });
+        html += '</ol>';
+        div.innerHTML = html;
+        body.appendChild(div);
+      }
+
+      // Вывод решения
+      const solutionContainer = document.createElement('div');
+      solutionContainer.innerHTML = renderSolutionBox(q, res.status);
+      body.appendChild(solutionContainer);
+
+      $('review-modal').classList.add('active');
+    }
+
+    $('btn-close-review').onclick = () => {$('review-modal').classList.remove('active');
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      $('btn-start').onclick = startTest;
+      $('btn-restart').onclick = startTest;
+      
+      const toUploadScreen = () => { clearProgress(); switchScreen('screen-upload'); };
+      $('btn-change-file').onclick = toUploadScreen;
+      $('btn-finish-change').onclick = toUploadScreen;
+
+      const dz = $('drop-zone');
+      const fileInp = $('file-input');
+      
+      dz.onclick = () => fileInp.click();
+      dz.ondragover = e => { e.preventDefault(); dz.classList.add('dragover'); };
+      dz.ondragleave = () => dz.classList.remove('dragover');
+      dz.ondrop = e => {
+        e.preventDefault();
+        dz.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+      };
+      fileInp.onchange = e => {
+        if (e.target.files.length) handleFile(e.target.files[0]);
+        fileInp.value = '';
+      };
+
+      
+
+      const saved = loadProgress();
+      if (saved && !saved.completed) {
+        state = saved;
+        showWelcomeScreen();
+      }
+    });
+  </script>
+</body>
+</html>
