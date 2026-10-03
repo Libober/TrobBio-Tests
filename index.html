@@ -547,9 +547,28 @@
 
     const STORAGE_KEY = 'test_progress_v2';
 
+    // Очистка состояния от тяжелых изображений (Base64) перед сохранением в localStorage
+    function getCleanStateForStorage() {
+      const cleanState = JSON.parse(JSON.stringify(state));
+      if (cleanState.questions && Array.isArray(cleanState.questions)) {
+        cleanState.questions.forEach(q => {
+          q.images = []; // Исключаем Base64-картинки из локального хранилища, чтобы не превышать квоту 5МБ
+        });
+      }
+      return cleanState;
+    }
+
     function saveProgress() {
       state.savedAt = Date.now();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      try {
+        const cleanState = getCleanStateForStorage();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanState));
+      } catch (e) {
+        console.warn('Превышена квота localStorage (QuotaExceededError). Прогресс сохранен только в оперативной памяти.', e);
+        try {
+          clearProgress();
+        } catch (clearErr) {}
+      }
     }
 
     function loadProgress() {
@@ -563,7 +582,11 @@
     }
 
     function clearProgress() {
-      localStorage.removeItem(STORAGE_KEY);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.error('Ошибка очистки localStorage', e);
+      }
     }
 
     /* Обработка HTML после считывания Mammoth.js */
@@ -898,6 +921,13 @@
         
         $('btn-modal-resume').onclick = () => {
           $('resume-modal').classList.remove('active');
+          // Сохраняем загруженные картинки текущей сессии
+          const currentQuestionsMap = new Map(parsedData.questions.map(q => [q.id, q.images]));
+          saved.questions.forEach(q => {
+            if (currentQuestionsMap.has(q.id)) {
+              q.images = currentQuestionsMap.get(q.id);
+            }
+          });
           state = saved;
           showWelcomeScreen();
         };
